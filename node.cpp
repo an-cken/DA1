@@ -190,26 +190,31 @@ void loop() {
         // Công thức nội suy nồng độ (CO2)
         float ppm_mq135 = PARA * pow(ratio, -PARB);
 
-        // --- 5. TẠO FILE JSON CHUẨN ĐẦU RA ---
+        // --- 5. TẠO FILE JSON CHUẨN ĐẦU RA (BAO GỒM RAW VÀ FILTERED) ---
         Serial.print("{");
 
-        Serial.print("\"temperature\":");
-        Serial.print(ema_temp, 2);
+        // Nhiệt độ
+        Serial.print("\"temp_raw\":"); Serial.print(raw_temp, 2);
+        Serial.print(",\"temp_filtered\":"); Serial.print(ema_temp, 2);
 
-        Serial.print(",\"humidity\":");
-        Serial.print(ema_hum, 2);
+        // Độ ẩm
+        Serial.print(",\"hum_raw\":"); Serial.print(raw_hum, 2);
+        Serial.print(",\"hum_filtered\":"); Serial.print(ema_hum, 2);
 
-        Serial.print(",\"lux\":");
-        Serial.print(filtered_lux, 2);
+        // Ánh sáng
+        Serial.print(",\"lux_raw\":"); Serial.print(raw_lux, 2);
+        Serial.print(",\"lux_filtered\":"); Serial.print(filtered_lux, 2);
 
-        Serial.print(",\"pressure\":");
-        Serial.print(filtered_pressure, 2);
+        // Áp suất
+        Serial.print(",\"pressure_raw\":"); Serial.print(raw_pressure, 2);
+        Serial.print(",\"pressure_filtered\":"); Serial.print(filtered_pressure, 2);
 
-        Serial.print(",\"ppm_mq135\":");
-        Serial.print(ppm_mq135, 2);
+        // Khí gas (MQ135)
+        Serial.print(",\"mq135_raw_adc\":"); Serial.print(raw_mq135, 0); // Raw ADC là số nguyên
+        Serial.print(",\"mq135_ppm\":"); Serial.print(ppm_mq135, 2);    // Nồng độ sau hiệu chuẩn
 
-        Serial.print(",\"timestamp\":");
-        Serial.print(millis());
+        // Timestamp
+        Serial.print(",\"timestamp\":"); Serial.print(millis());
 
         Serial.println("}");
     }
