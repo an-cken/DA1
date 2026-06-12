@@ -129,6 +129,7 @@ void loop() {
         float raw_lux = lightMeter.readLightLevel();
         float raw_pressure = bmp.readPressure();
         float raw_mq135 = analogRead(MQ135_PIN);
+        if (raw_mq135 <= 0) raw_mq135 = 1; // Ngăn lỗi chia cho 0
 
         // --- KIỂM TRA LỖI & TỰ ĐỘNG PHỤC HỒI ---
         if (isnan(raw_temp) || isnan(raw_hum) || raw_pressure <= 0) {
@@ -175,20 +176,39 @@ void loop() {
         ema_mq135 = (EMA_ALPHA * median_mq135) + ((1.0 - EMA_ALPHA) * ema_mq135);
 
         // --- 4. HIỆU CHỈNH & TÍNH TOÁN NỒNG ĐỘ MQ135 (PPM) ---
+        //Nhánh 1: tính toán giá trị mq135 sau khi lọc và hiệu chỉnh
         // Chuyển giá trị ADC 12-bit đã lọc mịn thành Điện trở Rs
-        float rs = ((4095.0 / ema_mq135) - 1.0) * RLOAD;
+        float rs_fil = ((4095.0 / ema_mq135) - 1.0) * RLOAD;
 
         // Tính hệ số bù trừ dựa trên Nhiệt độ và Độ ẩm thực tế (Đã qua lọc EMA)
-        float correction_factor = CORE * ema_temp + CORF * ema_hum + CORG;
-
+        float correction_factor;
+        if (ema_temp < 20.0) {
+        // nhiệt độ <20
+        correction_factor = CORA * ema_temp * ema_temp - 
+                            CORB * ema_temp + CORC - 
+                            (ema_hum - 33.0) * CORD;
+        } else {
+        // nhiệt độ >20
+        correction_factor = CORE * ema_temp + CORF * ema_hum + CORG;
+        }
         // Tính Rs thực tế
-        float rs_corrected = rs / correction_factor;
+        float rs_corrected = rs_fil / correction_factor;
         
         //Tính tỉ số Rs/Ro
-        float ratio = rs_corrected / RZERO;
+        float ratio_fil = rs_corrected / RZERO;
         
         // Công thức nội suy nồng độ (CO2)
-        float ppm_mq135 = PARA * pow(ratio, -PARB);
+        float ppm_mq135_fil = PARA * pow(ratio_fil, -PARB);
+
+        //Nhánh 2: tính giá trị mq135 gốc ở thang đo ppm
+        float rs = ((4095.0 / raw_mq135) - 1.0) * RLOAD;
+        
+        //Tính tỉ số Rs/Ro
+        float ratio = rs / RZERO;
+    
+        // Công thức nội suy nồng độ (CO2)
+        float ppm_mq135_raw = PARA * pow(ratio, -PARB);
+
 
         // --- 5. TẠO FILE JSON CHUẨN ĐẦU RA (BAO GỒM RAW VÀ FILTERED) ---
         Serial.print("{");
@@ -210,8 +230,8 @@ void loop() {
         Serial.print(",\"pressure_filtered\":"); Serial.print(filtered_pressure, 2);
 
         // Khí gas (MQ135)
-        Serial.print(",\"mq135_raw_adc\":"); Serial.print(raw_mq135, 0); // Raw ADC là số nguyên
-        Serial.print(",\"mq135_ppm\":"); Serial.print(ppm_mq135, 2);    // Nồng độ sau hiệu chuẩn
+        Serial.print(",\"mq135_ppm_raw\":"); Serial.print(ppm_mq135_raw, 2); //Nồng độ chưa fil và hiệu chỉnh
+        Serial.print(",\"mq135_ppm_fil\":"); Serial.print(ppm_mq135_fil, 2);    // Nồng độ sau fil và hiệu chỉnh
 
         // Timestamp
         Serial.print(",\"timestamp\":"); Serial.print(millis());
